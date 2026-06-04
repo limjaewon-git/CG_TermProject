@@ -20,9 +20,11 @@ export class InGameScreen {
 
         this.activeNotes = [];
         this.lines = []; 
-        this.particles = []; // 🌟 파티클 이펙트를 저장할 배열 추가
+        this.particles = []; 
+        this.buildings = []; 
         
         this.startTime = 0;
+        this.lastTime = 0; 
         this.isPlaying = false;
         this.noteSpeed = 40; 
         
@@ -76,12 +78,51 @@ export class InGameScreen {
         this.noteMatMikuBlue = new THREE.MeshStandardMaterial({ color: 0x39C5BB, metalness: 0.3, roughness: 0.2 }); 
         this.noteMatWhite = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.1, roughness: 0.5 });
 
+        this.initNeonBuildings(); 
+
         this.scene.add(this.gameGroup);
     }
 
-    start() {
+    initNeonBuildings() {
+        const colors = [0x39C5BB, 0xff00ff, 0x00ffff, 0x8a2be2];
+        const buildingGeo = new THREE.BoxGeometry(1, 1, 1);
+        
+        for (let i = 0; i < 60; i++) {
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            const isWireframe = Math.random() > 0.8; 
+            
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0x111111,
+                emissive: color,
+                emissiveIntensity: isWireframe ? 1.0 : 0.5,
+                transparent: true,
+                opacity: isWireframe ? 0.8 : 0.2 + Math.random() * 0.3,
+                wireframe: isWireframe
+            });
+            const mesh = new THREE.Mesh(buildingGeo, mat);
+
+            const width = 4 + Math.random() * 6;
+            const depth = 6 + Math.random() * 10;
+            const height = 15 + Math.random() * 40;
+
+            mesh.scale.set(width, height, depth);
+
+            const isLeft = i % 2 === 0;
+            const x = (isLeft ? -1 : 1) * (15 + Math.random() * 25);
+            const y = height / 2 - 5;
+            const z = 50 - Math.random() * 350; 
+
+            mesh.position.set(x, y, z);
+            this.gameGroup.add(mesh);
+            this.buildings.push(mesh);
+        }
+    }
+
+    start(delay = 0) {
         document.getElementById('ingame-ui').style.display = 'block';
-        this.startTime = performance.now() / 1000;
+        
+        this.startTime = (performance.now() / 1000) + delay;
+        this.lastTime = performance.now() / 1000;
         this.isPlaying = true;
         
         this.songData.notes.forEach(note => {
@@ -123,6 +164,11 @@ export class InGameScreen {
         });
     }
 
+    getCurrentTime() {
+        if (!this.isPlaying) return 0;
+        return (performance.now() / 1000) - this.startTime;
+    }
+
     groupNotesByTime(notes) {
         const map = new Map();
         notes.forEach(n => {
@@ -133,21 +179,18 @@ export class InGameScreen {
         return Array.from(map.values());
     }
 
-    // 🌟 파티클 이펙트 생성 함수
     createParticles(lane, colorHex) {
         const pos = this.lanePositions[lane];
-        const particleCount = 20; // 튀어오르는 파티클 갯수
+        const particleCount = 20; 
         const geo = new THREE.BufferGeometry();
         const positions = new Float32Array(particleCount * 3);
         const velocities = [];
 
         for(let i=0; i<particleCount; i++) {
-            // 판정선 박스 내에 무작위 분포
             positions[i*3] = pos.x + (Math.random() - 0.5) * 2;
             positions[i*3+1] = pos.y + (Math.random() - 0.5) * 2;
             positions[i*3+2] = this.targetZ;
 
-            // 터져나가는 방향 설정 (카메라 쪽으로 살짝 날아옴)
             velocities.push({
                 x: (Math.random() - 0.5) * 1.5,
                 y: (Math.random() - 0.5) * 1.5,
@@ -165,12 +208,11 @@ export class InGameScreen {
         this.particles.push({ mesh: points, velocities, life: 1.0 });
     }
 
-    // 판정에 따른 색깔 반환
     getColorFromJudge(judge) {
-        if (judge === 'PERFECT') return 0xff4444; // 빨강
-        if (judge === 'GREAT') return 0xffaa00; // 주황
-        if (judge === 'GOOD') return 0xffff00; // 노랑
-        return 0xaaaaaa; // 회색 (BAD/MISS)
+        if (judge === 'PERFECT') return 0xff4444; 
+        if (judge === 'GREAT') return 0xffaa00; 
+        if (judge === 'GOOD') return 0xffff00; 
+        return 0xaaaaaa; 
     }
 
     handleKeyDown(event) {
@@ -192,14 +234,12 @@ export class InGameScreen {
             holdingNote.hit = true;
             holdingNote.mesh.visible = false;
             this.addStatCount('MISS'); 
-            this.showJudgment('MISS', 0); // RELEASE MISS 대신 그냥 MISS
+            this.showJudgment('MISS', 0, false); 
         }
     }
 
     checkHit(lane) {
-        const currentTime = (performance.now() / 1000) - this.startTime;
-        
-        // 🌟 콤보 끊김 버그 해결 파트: 이미 홀딩중인 롱노트는 키보드 반복입력을 무시하도록 !n.holding 조건 추가
+        const currentTime = this.getCurrentTime();
         const validNotes = this.activeNotes.filter(n => n.lane === lane && !n.hit && !n.holding);
         if (validNotes.length === 0) return;
 
@@ -218,13 +258,13 @@ export class InGameScreen {
         else { judge = 'BAD'; score = 10; }
 
         this.addStatCount(judge);
-        this.createParticles(lane, this.getColorFromJudge(judge)); // 타격 파티클 이펙트 폭발!
+        this.createParticles(lane, this.getColorFromJudge(judge)); 
 
         if (targetNote.isLong) {
             targetNote.holding = true;
-            this.showJudgment(judge, score / 2); // LONG 텍스트 없이 깔끔하게
+            this.showJudgment(judge, score / 2, true); 
         } else {
-            this.showJudgment(judge, score);
+            this.showJudgment(judge, score, false);
             targetNote.hit = true;
             targetNote.mesh.visible = false; 
         }
@@ -238,13 +278,12 @@ export class InGameScreen {
         else if (judge === 'MISS') this.missCount++;
     }
 
-    showJudgment(text, scoreAdd) {
+    showJudgment(text, scoreAdd, isLongHold = false) {
         const judgeEl = document.getElementById('judge-text');
         const comboContainer = document.getElementById('combo-container');
         const comboEl = document.getElementById('combo-display');
         judgeEl.innerText = text;
         
-        // 글씨 색상
         if(text === 'PERFECT') judgeEl.style.color = '#ff4444'; 
         else if(text === 'GREAT') judgeEl.style.color = '#ffaa00'; 
         else judgeEl.style.color = '#ffff00';
@@ -260,8 +299,13 @@ export class InGameScreen {
         }
 
         this.score += scoreAdd;
+        
+        // 🌟 화면 상단 스코어 표기 업데이트
         document.getElementById('score-display').innerText = String(this.score).padStart(6, '0');
+        
+        // 🌟 HP 바 너비와 숫자 텍스트 모두 실시간으로 갱신
         document.getElementById('hp-fill').style.width = `${Math.max(0, this.hp)}%`;
+        document.getElementById('hp-text').innerText = Math.max(0, this.hp); 
         
         if (this.combo > 1) {
             comboContainer.style.display = 'block';
@@ -270,18 +314,20 @@ export class InGameScreen {
             comboContainer.style.display = 'none';
         }
 
-        // 🌟 글씨 임팩트 팝(Pop) 효과 및 페이드 아웃
-        judgeEl.style.transition = 'none'; // 이전 애니메이션 취소
-        judgeEl.style.transform = 'translate(-50%, -50%) scale(1.6)'; // 확 커지게
+        judgeEl.style.transition = 'none'; 
+        judgeEl.style.transform = 'translate(-50%, -50%) scale(1.6)'; 
         judgeEl.style.opacity = '1';
 
-        // 즉시 적용을 위해 브라우저 렌더링 강제 업데이트
         void judgeEl.offsetWidth;
 
-        // 자연스럽게 제 크기로 돌아온 뒤 사라지는 트랜지션
-        judgeEl.style.transition = 'transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s 0.5s ease-out';
-        judgeEl.style.transform = 'translate(-50%, -50%) scale(1)';
-        judgeEl.style.opacity = '0';
+        if (isLongHold) {
+            judgeEl.style.transition = 'transform 0.1s ease-out';
+            judgeEl.style.transform = 'translate(-50%, -50%) scale(1)';
+        } else {
+            judgeEl.style.transition = 'transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s 0.5s ease-out';
+            judgeEl.style.transform = 'translate(-50%, -50%) scale(1)';
+            judgeEl.style.opacity = '0';
+        }
 
         if (this.hp <= 0 && this.isPlaying) {
             this.isPlaying = false;
@@ -291,6 +337,7 @@ export class InGameScreen {
 
     getStats() {
         return { 
+            score: this.score, 
             hp: this.hp, maxCombo: this.maxCombo, totalNotes: this.totalNotes,
             perfectCount: this.perfectCount, greatCount: this.greatCount, 
             goodCount: this.goodCount, badCount: this.badCount, missCount: this.missCount 
@@ -304,7 +351,13 @@ export class InGameScreen {
         this.activeNotes = [];
         this.lines.forEach(l => this.gameGroup.remove(l.line));
         this.particles.forEach(p => this.gameGroup.remove(p.mesh));
+        this.buildings.forEach(b => {
+            this.gameGroup.remove(b);
+            b.geometry.dispose();
+            b.material.dispose();
+        });
         this.particles = [];
+        this.buildings = [];
         this.cubeGeo.dispose();
         this.sphereGeo.dispose();
         this.noteMatMikuBlue.dispose();
@@ -313,33 +366,52 @@ export class InGameScreen {
 
     update() {
         if (!this.isPlaying) return;
-        const currentTime = (performance.now() / 1000) - this.startTime;
+        
+        const now = performance.now() / 1000;
+        const delta = now - this.lastTime;
+        this.lastTime = now;
+        
+        const currentTime = this.getCurrentTime();
         let allNotesProcessed = true;
+
+        this.buildings.forEach(b => {
+            b.position.z += this.noteSpeed * delta;
+            if (b.position.z > 50) {
+                b.position.z -= 400; 
+            }
+        });
 
         this.activeNotes.forEach(note => {
             if (!note.hit) {
                 allNotesProcessed = false;
                 const startDistanceLeft = (note.time - currentTime) * this.noteSpeed;
                 
-                // 🌟 롱노트 슬라이딩 자연스럽게 유지되도록 개선
-                note.mesh.position.z = this.targetZ - startDistanceLeft;
-
                 if (note.holding) {
+                    note.mesh.position.z = this.targetZ; 
+
+                    const remainingTime = note.endTime - currentTime;
+                    const totalDuration = note.endTime - note.time;
+                    const scaleFactor = Math.max(0, remainingTime / totalDuration);
+                    note.mesh.scale.z = scaleFactor; 
+
+                    const judgeEl = document.getElementById('judge-text');
+                    judgeEl.style.opacity = '1';
+
                     if (currentTime >= note.endTime) {
                         note.holding = false;
                         note.hit = true;
                         note.mesh.visible = false;
                         this.addStatCount('PERFECT'); 
-                        this.showJudgment('PERFECT', 100);
-                        this.createParticles(note.lane, 0xff4444); // 롱노트 완주 시 터지는 이펙트
+                        this.showJudgment('PERFECT', 100, false); 
+                        this.createParticles(note.lane, 0xff4444); 
                     }
                 } else {
+                    note.mesh.position.z = this.targetZ - startDistanceLeft;
                     if (!note.isLong) {
                         note.mesh.rotation.x += 0.05;
                         note.mesh.rotation.y += 0.02;
                     }
 
-                    // 지나친 노트 통과 계산 (롱노트면 꼬리가, 일반노트면 머리가 지나갔을 때 기준)
                     const passTime = note.isLong ? note.endTime : note.time;
                     const passDistance = (passTime - currentTime) * this.noteSpeed;
 
@@ -347,7 +419,7 @@ export class InGameScreen {
                         note.hit = true;
                         note.mesh.visible = false;
                         this.missCount++;
-                        this.showJudgment('MISS', 0);
+                        this.showJudgment('MISS', 0, false);
                     }
                 }
             }
@@ -366,7 +438,6 @@ export class InGameScreen {
             }
         });
 
-        // 🌟 업데이트 안에서 파티클 애니메이션 프레임 제어
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
             p.life -= 0.04;
