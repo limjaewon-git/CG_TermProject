@@ -4,63 +4,79 @@
     <meta charset="utf-8">
     <title>Hatsune Miku in 3D Rhythm Game</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000000; font-family: 'Arial', sans-serif; }
+        body { margin: 0; overflow: hidden; background-color: #000000; font-family: 'Arial', sans-serif; user-select: none; }
         
-        #bg-video {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;
-            z-index: 1; 
-        }
-        #canvas-container {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 2; 
-        }
-        #ui-layer { 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            pointer-events: none; 
-            z-index: 3; 
-        }
+        #bg-video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
         
+        .game-btn {
+            pointer-events: auto; padding: 15px 40px; font-size: 22px; font-weight: bold; 
+            color: #fff; background: linear-gradient(135deg, #2b938b 0%, #39C5BB 100%);
+            border: 2px solid #87CEEB; border-radius: 15px; cursor: pointer;
+            box-shadow: 0 0 15px #39C5BB, inset 0 0 10px rgba(255,255,255,0.3);
+            text-shadow: 0 0 5px #000; transition: all 0.2s ease;
+        }
+        .game-btn:hover {
+            transform: scale(1.03); background: #fff; color: #39C5BB;
+            box-shadow: 0 0 25px #fff, 0 0 35px #39C5BB;
+        }
+
         #start-ui { 
             display: flex; flex-direction: column; align-items: center; justify-content: center; 
-            height: 100%; position: relative; 
-            background-image: url('./start_screen.jpg'); 
-            background-size: cover; background-position: center;
-            pointer-events: auto;
+            height: 100%; background-image: url('./start_screen.jpg'); background-size: cover; background-position: center; pointer-events: auto;
         }
-        
         .title-logo {
-            position: absolute; top: 50px; right: 50px;
-            font-size: 48px; font-weight: bold; color: #87CEEB; 
-            text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000;
+            position: absolute; top: 60px; right: 60px; font-size: 52px; font-weight: bold; color: #87CEEB; 
+            text-shadow: -3px -3px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000, 3px 3px 0 #000, 0 0 20px #39C5BB;
         }
-
-        .btn { 
-            pointer-events: auto; padding: 15px 50px; font-size: 28px; font-weight: bold; 
-            color: white; background-color: #39C5BB; 
-            border: 3px solid white; border-radius: 40px; cursor: pointer; transition: 0.3s; 
-            position: absolute; bottom: 100px;
-        }
-        .btn:hover { background-color: #ffffff; color: #39C5BB; }
 
         #select-ui { 
-            display: none; flex-direction: column; align-items: center; justify-content: flex-start; 
-            height: 100%; padding-top: 100px;
-            background-image: url('./select_screen.jpg'); 
-            background-size: cover; background-position: center;
-            pointer-events: auto;
+            display: none; width: 100%; height: 100%; 
+            background-image: url('./select_screen.jpg'); background-size: cover; background-position: center;
+            pointer-events: auto; box-sizing: border-box; padding: 60px;
+            align-items: center; justify-content: space-between;
+        }
+        .song-selection-panel {
+            display: flex; flex-direction: column; width: 45%; height: 70%; justify-content: center; gap: 25px;
+        }
+        .song-node-btn {
+            width: 100%; text-align: left; font-size: 24px; padding: 22px 30px;
+            background: rgba(0, 0, 0, 0.75); border: 2px solid #39C5BB; border-radius: 20px;
+            color: #fff; cursor: pointer; transition: all 0.2s; pointer-events: auto;
+            box-shadow: 0 0 10px rgba(57, 197, 187, 0.2);
+        }
+        .song-node-btn:hover, .song-node-btn.active {
+            background: linear-gradient(90deg, rgba(57,197,187,0.8) 0%, rgba(0,0,0,0.7) 100%);
+            border-color: #fff; box-shadow: 0 0 20px #39C5BB; transform: translateX(12px);
+        }
+        
+        .record-dashboard {
+            width: 45%; height: 75%; background: rgba(0, 0, 0, 0.82);
+            border: 3px solid #39C5BB; border-radius: 25px; box-shadow: 0 0 30px rgba(57,197,187,0.4);
+            box-sizing: border-box; padding: 40px; color: white; display: flex; flex-direction: column; justify-content: space-between;
+        }
+        .dashboard-title { font-size: 32px; font-weight: bold; color: #87CEEB; border-bottom: 2px solid #39C5BB; padding-bottom: 12px; text-shadow: 0 0 10px #39C5BB; }
+        .stat-row { display: flex; justify-content: space-between; font-size: 24px; margin: 20px 0; color: #eee; font-weight: bold; align-items: center; }
+        .stat-value { color: #39C5BB; text-shadow: 0 0 8px rgba(57,197,187,0.6); font-size: 28px; }
+        .medal-badge {
+            font-size: 26px; font-weight: bold; text-align: center; padding: 12px; border-radius: 12px;
+            text-shadow: 0 0 10px rgba(255,255,255,0.3); display: none; background: rgba(255,255,255,0.05); margin-top: 15px;
         }
 
         #ingame-ui { display: none; padding: 20px; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); width: 100%; height: 100%; box-sizing: border-box; position: relative; }
-        
+        #countdown-display { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 150px; font-weight: bold; color: white; text-shadow: 0 0 30px #39C5BB; z-index: 20; }
         .top-bar { display: flex; justify-content: space-between; font-size: 28px; font-weight: bold; }
         .score-box span { color: #39C5BB; font-size: 40px; }
-        .hp-bar { width: 300px; height: 20px; background: rgba(0,0,0,0.5); border: 2px solid white; }
+        
+        /* 🌟 HP 텍스트 숫자와 게이지 바 정렬 스타일 추가 */
+        .hp-box { display: flex; align-items: center; font-size: 28px; font-weight: bold; }
+        #hp-text { color: #39C5BB; margin-left: 15px; font-size: 32px; min-width: 60px; text-align: right; text-shadow: 0 0 8px #39C5BB;}
+        .hp-bar { width: 300px; height: 20px; background: rgba(0,0,0,0.5); border: 2px solid white; margin-left: 15px; }
         .hp-fill { width: 100%; height: 100%; background: #39C5BB; transition: width 0.2s; }
         
-        #ingame-back-btn { position: absolute; bottom: 30px; left: 30px; font-size: 18px; padding: 10px 20px; background-color: #ff4444; border-color: #ffffff; pointer-events: auto; }
-        
-        #judge-text { position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); font-size: 60px; font-weight: bold; text-align: center; transition: transform 0.1s; }
-        
+        #ingame-back-btn { position: absolute; bottom: 30px; left: 30px; background: #ff4444; border-color: #ff8888; box-shadow: 0 0 15px #ff4444; }
+        #judge-text { position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); font-size: 60px; font-weight: bold; text-align: center; }
         #combo-container { position: absolute; top: 50%; right: 10%; transform: translateY(-50%); text-align: center; display: none; }
         .triangle-bg { width: 0; height: 0; border-left: 80px solid transparent; border-right: 80px solid transparent; border-top: 120px solid rgba(255, 255, 255, 0.2); position: absolute; top: -10px; left: 50%; transform: translateX(-50%); z-index: -1; }
         #combo-title { font-size: 20px; font-weight: bold; color: white; margin-bottom: 5px; }
@@ -69,11 +85,7 @@
         #result-ui { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); flex-direction: column; align-items: center; justify-content: center; pointer-events: auto; z-index: 10;}
         #result-status { font-size: 70px; font-weight: bold; margin-bottom: 10px; }
         #result-max-combo { font-size: 35px; color: #39C5BB; margin-bottom: 30px; font-weight: bold; }
-        
-        #result-detailed-stats { 
-            font-size: 24px; color: white; margin-bottom: 40px; text-align: left; 
-            line-height: 1.8; width: 250px; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);
-        }
+        #result-detailed-stats { font-size: 24px; color: white; margin-bottom: 40px; text-align: left; line-height: 1.8; width: 250px; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); }
         .stat-line { display: flex; justify-content: space-between; font-weight: bold; }
     </style>
     <script type="importmap">
@@ -86,26 +98,54 @@
     </script>
 </head>
 <body>
-    <video id="bg-video" playsinline style="display:none;">
-        <source src="./HoYoHoYoにしてあげる♪.mp4" type="video/mp4">
-    </video>
-
+    <video id="bg-video" playsinline style="display:none;"></video>
     <div id="canvas-container"></div>
 
     <div id="ui-layer">
+        <div id="countdown-display"></div>
+
         <div id="start-ui">
             <div class="title-logo">Hatsune Miku in 3D Rhythm Game</div>
-            <button id="start-btn" class="btn">START</button>
+            <button id="start-btn" class="game-btn" style="font-size: 35px; padding: 20px 70px;">GAME START</button>
         </div>
 
         <div id="select-ui">
-            <button id="song-hoyohoyo" class="btn" style="position: relative; bottom: auto;">♪ HoYoHoYoにしてあげる♪</button>
+            <div class="song-selection-panel">
+                <button id="song-hoyohoyo" class="song-node-btn">♪ HoYoHoYoにしてあげる♪</button>
+                <button id="song-rinne" class="song-node-btn">♪ いますぐ輪廻</button>
+                <button id="select-back-btn" class="game-btn" style="position: relative; bottom: auto; align-self: flex-start; margin-top: 25px; background: #444; border-color: #666; box-shadow: 0 0 10px #444;">BACK TO MAIN</button>
+            </div>
+            
+            <div class="record-dashboard">
+                <div>
+                    <div class="dashboard-title">SONG INFO & RECORDS</div>
+                    <div class="stat-row" style="margin-top: 25px;">
+                        <span>DIFFICULTY</span>
+                        <span id="board-difficulty" class="stat-value" style="font-weight: 900;">EASY</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>HIGH SCORE</span>
+                        <span id="board-score" class="stat-value">000,000</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>MAX COMBO</span>
+                        <span id="board-combo" class="stat-value">0</span>
+                    </div>
+                    <div id="board-medal" class="medal-badge">NO RECORD</div>
+                </div>
+                <button id="play-song-btn" class="game-btn" style="position: relative; bottom: auto; width: 100%;">START GAME</button>
+            </div>
         </div>
 
         <div id="ingame-ui">
             <div class="top-bar">
                 <div class="score-box">SCORE <br><span id="score-display">000000</span></div>
-                <div class="hp-box">HP <div class="hp-bar"><div id="hp-fill" class="hp-fill"></div></div></div>
+                
+                <div class="hp-box">
+                    HP <span id="hp-text">100</span>
+                    <div class="hp-bar"><div id="hp-fill" class="hp-fill"></div></div>
+                </div>
+                
             </div>
             <div id="judge-text"></div>
             <div id="combo-container">
@@ -113,7 +153,7 @@
                 <div id="combo-title">COMBO</div>
                 <div id="combo-display"></div>
             </div>
-            <button id="ingame-back-btn" class="btn">Back</button>
+            <button id="ingame-back-btn" class="game-btn">Back</button>
         </div>
 
         <div id="result-ui">
@@ -126,7 +166,7 @@
                 <div class="stat-line" style="color: #aaaaaa;">BAD <span id="res-bad">0</span></div>
                 <div class="stat-line" style="color: #ff0000;">MISS <span id="res-miss">0</span></div>
             </div>
-            <button id="result-back-btn" class="btn" style="position: relative; bottom: auto;">Go to Song Select</button>
+            <button id="result-back-btn" class="game-btn" style="position: relative; bottom: auto;">Go to Song Select</button>
         </div>
     </div>
     
