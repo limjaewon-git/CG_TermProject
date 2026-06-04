@@ -1,469 +1,175 @@
-import * as THREE from 'three';
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <title>Hatsune Miku in 3D Rhythm Game</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000000; font-family: 'Arial', sans-serif; user-select: none; }
+        
+        #bg-video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
+        
+        .game-btn {
+            pointer-events: auto; padding: 15px 40px; font-size: 22px; font-weight: bold; 
+            color: #fff; background: linear-gradient(135deg, #2b938b 0%, #39C5BB 100%);
+            border: 2px solid #87CEEB; border-radius: 15px; cursor: pointer;
+            box-shadow: 0 0 15px #39C5BB, inset 0 0 10px rgba(255,255,255,0.3);
+            text-shadow: 0 0 5px #000; transition: all 0.2s ease;
+        }
+        .game-btn:hover {
+            transform: scale(1.03); background: #fff; color: #39C5BB;
+            box-shadow: 0 0 25px #fff, 0 0 35px #39C5BB;
+        }
 
-export class InGameScreen {
-    constructor(scene, camera, songData) {
-        this.scene = scene;
-        this.camera = camera;
-        this.songData = songData;
-        this.gameGroup = new THREE.Group();
-        
-        this.score = 0;
-        this.combo = 0;
-        this.hp = 100;
-        this.maxCombo = 0;
-        this.perfectCount = 0;
-        this.greatCount = 0;
-        this.goodCount = 0;
-        this.badCount = 0;
-        this.missCount = 0;
-        this.totalNotes = songData.notes.length;
+        #start-ui { 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            height: 100%; background-image: url('./start_screen.jpg'); background-size: cover; background-position: center; pointer-events: auto;
+        }
+        .title-logo {
+            position: absolute; top: 60px; right: 60px; font-size: 52px; font-weight: bold; color: #87CEEB; 
+            text-shadow: -3px -3px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000, 3px 3px 0 #000, 0 0 20px #39C5BB;
+        }
 
-        this.activeNotes = [];
-        this.lines = []; 
-        this.particles = []; 
-        this.buildings = []; 
+        #select-ui { 
+            display: none; width: 100%; height: 100%; 
+            background-image: url('./select_screen.jpg'); background-size: cover; background-position: center;
+            pointer-events: auto; box-sizing: border-box; padding: 60px;
+            align-items: center; justify-content: space-between;
+        }
+        .song-selection-panel {
+            display: flex; flex-direction: column; width: 45%; height: 70%; justify-content: center; gap: 25px;
+        }
+        .song-node-btn {
+            width: 100%; text-align: left; font-size: 24px; padding: 22px 30px;
+            background: rgba(0, 0, 0, 0.75); border: 2px solid #39C5BB; border-radius: 20px;
+            color: #fff; cursor: pointer; transition: all 0.2s; pointer-events: auto;
+            box-shadow: 0 0 10px rgba(57, 197, 187, 0.2);
+        }
+        .song-node-btn:hover, .song-node-btn.active {
+            background: linear-gradient(90deg, rgba(57,197,187,0.8) 0%, rgba(0,0,0,0.7) 100%);
+            border-color: #fff; box-shadow: 0 0 20px #39C5BB; transform: translateX(12px);
+        }
         
-        this.startTime = 0;
-        this.lastTime = 0; 
-        this.isPlaying = false;
-        this.noteSpeed = 40; 
+        .record-dashboard {
+            width: 45%; height: 75%; background: rgba(0, 0, 0, 0.82);
+            border: 3px solid #39C5BB; border-radius: 25px; box-shadow: 0 0 30px rgba(57,197,187,0.4);
+            box-sizing: border-box; padding: 40px; color: white; display: flex; flex-direction: column; justify-content: space-between;
+        }
+        .dashboard-title { font-size: 32px; font-weight: bold; color: #87CEEB; border-bottom: 2px solid #39C5BB; padding-bottom: 12px; text-shadow: 0 0 10px #39C5BB; }
+        .stat-row { display: flex; justify-content: space-between; font-size: 24px; margin: 20px 0; color: #eee; font-weight: bold; align-items: center; }
+        .stat-value { color: #39C5BB; text-shadow: 0 0 8px rgba(57,197,187,0.6); font-size: 28px; }
+        .medal-badge {
+            font-size: 26px; font-weight: bold; text-align: center; padding: 12px; border-radius: 12px;
+            text-shadow: 0 0 10px rgba(255,255,255,0.3); display: none; background: rgba(255,255,255,0.05); margin-top: 15px;
+        }
+
+        #ingame-ui { display: none; padding: 20px; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); width: 100%; height: 100%; box-sizing: border-box; position: relative; }
+        #countdown-display { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 150px; font-weight: bold; color: white; text-shadow: 0 0 30px #39C5BB; z-index: 20; }
+        .top-bar { display: flex; justify-content: space-between; font-size: 28px; font-weight: bold; }
+        .score-box span { color: #39C5BB; font-size: 40px; }
         
-        this.keyMap = { 'e': 0, 'r': 1, 'u': 2, 'i': 3, 'd': 4, 'f': 5, 'j': 6, 'k': 7 };
+        /* 🌟 HP 텍스트 숫자와 게이지 바 정렬 스타일 추가 */
+        .hp-box { display: flex; align-items: center; font-size: 28px; font-weight: bold; }
+        #hp-text { color: #39C5BB; margin-left: 15px; font-size: 32px; min-width: 60px; text-align: right; text-shadow: 0 0 8px #39C5BB;}
+        .hp-bar { width: 300px; height: 20px; background: rgba(0,0,0,0.5); border: 2px solid white; margin-left: 15px; }
+        .hp-fill { width: 100%; height: 100%; background: #39C5BB; transition: width 0.2s; }
         
-        this.lanePositions = [
-            { x: -6, y: 6 }, { x: -2, y: 6 }, { x: 2, y: 6 }, { x: 6, y: 6 }, 
-            { x: -6, y: 0 }, { x: -2, y: 0 }, { x: 2, y: 0 }, { x: 6, y: 0 }  
-        ];
-        
-        this.targetZ = 10;
-        this.initEnvironment();
-        
-        this.boundHandleKeyDown = this.handleKeyDown.bind(this);
-        this.boundHandleKeyUp = this.handleKeyUp.bind(this);
-        
-        window.addEventListener('keydown', this.boundHandleKeyDown);
-        window.addEventListener('keyup', this.boundHandleKeyUp); 
+        #ingame-back-btn { position: absolute; bottom: 30px; left: 30px; background: #ff4444; border-color: #ff8888; box-shadow: 0 0 15px #ff4444; }
+        #judge-text { position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); font-size: 60px; font-weight: bold; text-align: center; }
+        #combo-container { position: absolute; top: 50%; right: 10%; transform: translateY(-50%); text-align: center; display: none; }
+        .triangle-bg { width: 0; height: 0; border-left: 80px solid transparent; border-right: 80px solid transparent; border-top: 120px solid rgba(255, 255, 255, 0.2); position: absolute; top: -10px; left: 50%; transform: translateX(-50%); z-index: -1; }
+        #combo-title { font-size: 20px; font-weight: bold; color: white; margin-bottom: 5px; }
+        #combo-display { font-size: 45px; color: #39C5BB; font-weight: bold; }
+
+        #result-ui { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); flex-direction: column; align-items: center; justify-content: center; pointer-events: auto; z-index: 10;}
+        #result-status { font-size: 70px; font-weight: bold; margin-bottom: 10px; }
+        #result-max-combo { font-size: 35px; color: #39C5BB; margin-bottom: 30px; font-weight: bold; }
+        #result-detailed-stats { font-size: 24px; color: white; margin-bottom: 40px; text-align: left; line-height: 1.8; width: 250px; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); }
+        .stat-line { display: flex; justify-content: space-between; font-weight: bold; }
+    </style>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.159.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.159.0/examples/jsm/"
+        }
     }
+    </script>
+</head>
+<body>
+    <video id="bg-video" playsinline style="display:none;"></video>
+    <div id="canvas-container"></div>
 
-    initEnvironment() {
-        this.scene.background = null; 
+    <div id="ui-layer">
+        <div id="countdown-display"></div>
 
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
-        dirLight.position.set(0, 20, 20);
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
-        this.gameGroup.add(dirLight, ambientLight);
+        <div id="start-ui">
+            <div class="title-logo">Hatsune Miku in 3D Rhythm Game</div>
+            <button id="start-btn" class="game-btn" style="font-size: 35px; padding: 20px 70px;">GAME START</button>
+        </div>
 
-        const targetGeo = new THREE.BoxGeometry(3, 3, 0.5);
-        const targetMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.8 });
-        
-        this.lanePositions.forEach(pos => {
-            const target = new THREE.Mesh(targetGeo, targetMat);
-            target.position.set(pos.x, pos.y, this.targetZ);
-            this.gameGroup.add(target);
-        });
-
-        const railMat = new THREE.LineBasicMaterial({ color: 0x39C5BB, transparent: true, opacity: 0.4 });
-        this.lanePositions.forEach(pos => {
-            const points = [];
-            points.push(new THREE.Vector3(pos.x, pos.y, this.targetZ + 5)); 
-            points.push(new THREE.Vector3(pos.x, pos.y, -500)); 
-            const railGeo = new THREE.BufferGeometry().setFromPoints(points);
-            const rail = new THREE.Line(railGeo, railMat);
-            this.gameGroup.add(rail);
-        });
-
-        this.cubeGeo = new THREE.BoxGeometry(2.5, 2.5, 2.5);
-        this.sphereGeo = new THREE.SphereGeometry(1.5, 32, 32);
-        
-        this.noteMatMikuBlue = new THREE.MeshStandardMaterial({ color: 0x39C5BB, metalness: 0.3, roughness: 0.2 }); 
-        this.noteMatWhite = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.1, roughness: 0.5 });
-
-        this.initNeonBuildings(); 
-
-        this.scene.add(this.gameGroup);
-    }
-
-    initNeonBuildings() {
-        const colors = [0x39C5BB, 0xff00ff, 0x00ffff, 0x8a2be2];
-        const buildingGeo = new THREE.BoxGeometry(1, 1, 1);
-        
-        for (let i = 0; i < 60; i++) {
-            const color = colors[Math.floor(Math.random() * colors.length)];
-            const isWireframe = Math.random() > 0.8; 
+        <div id="select-ui">
+            <div class="song-selection-panel">
+                <button id="song-hoyohoyo" class="song-node-btn">♪ HoYoHoYoにしてあげる♪</button>
+                <button id="song-rinne" class="song-node-btn">♪ いますぐ輪廻</button>
+                <button id="select-back-btn" class="game-btn" style="position: relative; bottom: auto; align-self: flex-start; margin-top: 25px; background: #444; border-color: #666; box-shadow: 0 0 10px #444;">BACK TO MAIN</button>
+            </div>
             
-            const mat = new THREE.MeshStandardMaterial({
-                color: 0x111111,
-                emissive: color,
-                emissiveIntensity: isWireframe ? 1.0 : 0.5,
-                transparent: true,
-                opacity: isWireframe ? 0.8 : 0.2 + Math.random() * 0.3,
-                wireframe: isWireframe
-            });
-            const mesh = new THREE.Mesh(buildingGeo, mat);
+            <div class="record-dashboard">
+                <div>
+                    <div class="dashboard-title">SONG INFO & RECORDS</div>
+                    <div class="stat-row" style="margin-top: 25px;">
+                        <span>DIFFICULTY</span>
+                        <span id="board-difficulty" class="stat-value" style="font-weight: 900;">EASY</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>HIGH SCORE</span>
+                        <span id="board-score" class="stat-value">000,000</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>MAX COMBO</span>
+                        <span id="board-combo" class="stat-value">0</span>
+                    </div>
+                    <div id="board-medal" class="medal-badge">NO RECORD</div>
+                </div>
+                <button id="play-song-btn" class="game-btn" style="position: relative; bottom: auto; width: 100%;">START GAME</button>
+            </div>
+        </div>
 
-            const width = 4 + Math.random() * 6;
-            const depth = 6 + Math.random() * 10;
-            const height = 15 + Math.random() * 40;
-
-            mesh.scale.set(width, height, depth);
-
-            const isLeft = i % 2 === 0;
-            const x = (isLeft ? -1 : 1) * (15 + Math.random() * 25);
-            const y = height / 2 - 5;
-            const z = 50 - Math.random() * 350; 
-
-            mesh.position.set(x, y, z);
-            this.gameGroup.add(mesh);
-            this.buildings.push(mesh);
-        }
-    }
-
-    start(delay = 0) {
-        document.getElementById('ingame-ui').style.display = 'block';
-        
-        this.startTime = (performance.now() / 1000) + delay;
-        this.lastTime = performance.now() / 1000;
-        this.isPlaying = true;
-        
-        this.songData.notes.forEach(note => {
-            let mesh;
-            if (note.isLong) {
-                const length = (note.endTime - note.time) * this.noteSpeed;
-                const geometry = new THREE.CylinderGeometry(1.8, 1.8, length, 32);
-                geometry.rotateX(Math.PI / 2); 
-                geometry.translate(0, 0, -length / 2); 
-
-                const material = new THREE.MeshStandardMaterial({ color: 0x39C5BB, emissive: 0x113333, transparent: true, opacity: 0.8 });
-                mesh = new THREE.Mesh(geometry, material);
-            } else {
-                const isTopLane = note.lane < 4; 
-                const geometry = isTopLane ? this.cubeGeo : this.sphereGeo;
-                const material = isTopLane ? this.noteMatMikuBlue : this.noteMatWhite;
-                mesh = new THREE.Mesh(geometry, material);
-            }
-
-            const spawnDistance = (note.time * this.noteSpeed);
-            mesh.position.set(this.lanePositions[note.lane].x, this.lanePositions[note.lane].y, this.targetZ - spawnDistance);
-            this.gameGroup.add(mesh);
-            
-            this.activeNotes.push({ 
-                mesh, time: note.time, endTime: note.endTime, lane: note.lane, 
-                isLong: note.isLong || false, hit: false, holding: false 
-            });
-        });
-
-        const groupedNotes = this.groupNotesByTime(this.activeNotes);
-        groupedNotes.forEach(group => {
-            if (group.length > 1) {
-                const lineMat = new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 2 });
-                const lineGeo = new THREE.BufferGeometry();
-                const line = new THREE.Line(lineGeo, lineMat);
-                this.gameGroup.add(line);
-                this.lines.push({ line, notes: group, time: group[0].time });
-            }
-        });
-    }
-
-    getCurrentTime() {
-        if (!this.isPlaying) return 0;
-        return (performance.now() / 1000) - this.startTime;
-    }
-
-    groupNotesByTime(notes) {
-        const map = new Map();
-        notes.forEach(n => {
-            const timeKey = n.time.toFixed(2);
-            if (!map.has(timeKey)) map.set(timeKey, []);
-            map.get(timeKey).push(n);
-        });
-        return Array.from(map.values());
-    }
-
-    createParticles(lane, colorHex) {
-        const pos = this.lanePositions[lane];
-        const particleCount = 20; 
-        const geo = new THREE.BufferGeometry();
-        const positions = new Float32Array(particleCount * 3);
-        const velocities = [];
-
-        for(let i=0; i<particleCount; i++) {
-            positions[i*3] = pos.x + (Math.random() - 0.5) * 2;
-            positions[i*3+1] = pos.y + (Math.random() - 0.5) * 2;
-            positions[i*3+2] = this.targetZ;
-
-            velocities.push({
-                x: (Math.random() - 0.5) * 1.5,
-                y: (Math.random() - 0.5) * 1.5,
-                z: (Math.random() * 2) 
-            });
-        }
-        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        
-        const mat = new THREE.PointsMaterial({
-            color: colorHex, size: 0.6, transparent: true, opacity: 1, blending: THREE.AdditiveBlending
-        });
-
-        const points = new THREE.Points(geo, mat);
-        this.gameGroup.add(points);
-        this.particles.push({ mesh: points, velocities, life: 1.0 });
-    }
-
-    getColorFromJudge(judge) {
-        if (judge === 'PERFECT') return 0xff4444; 
-        if (judge === 'GREAT') return 0xffaa00; 
-        if (judge === 'GOOD') return 0xffff00; 
-        return 0xaaaaaa; 
-    }
-
-    handleKeyDown(event) {
-        if (!this.isPlaying) return;
-        const key = event.key.toLowerCase();
-        const lane = this.keyMap[key];
-        if (lane !== undefined) this.checkHit(lane);
-    }
-
-    handleKeyUp(event) {
-        if (!this.isPlaying) return;
-        const key = event.key.toLowerCase();
-        const lane = this.keyMap[key];
-        if (lane === undefined) return;
-
-        const holdingNote = this.activeNotes.find(n => n.lane === lane && n.holding);
-        if (holdingNote) {
-            holdingNote.holding = false;
-            holdingNote.hit = true;
-            holdingNote.mesh.visible = false;
-            this.addStatCount('MISS'); 
-            this.showJudgment('MISS', 0, false); 
-        }
-    }
-
-    checkHit(lane) {
-        const currentTime = this.getCurrentTime();
-        const validNotes = this.activeNotes.filter(n => n.lane === lane && !n.hit && !n.holding);
-        if (validNotes.length === 0) return;
-
-        validNotes.sort((a, b) => Math.abs(a.time - currentTime) - Math.abs(b.time - currentTime));
-        const targetNote = validNotes[0];
-        const timeDiff = targetNote.time - currentTime;
-
-        if (timeDiff > 0.4 || timeDiff < -0.6) return; 
-        const absDiff = Math.abs(timeDiff);
-
-        let judge = 'PERFECT';
-        let score = 100;
-        if (absDiff < 0.15) { judge = 'PERFECT'; score = 100; }
-        else if (absDiff < 0.25) { judge = 'GREAT'; score = 60; }
-        else if (absDiff < 0.40) { judge = 'GOOD'; score = 30; }
-        else { judge = 'BAD'; score = 10; }
-
-        this.addStatCount(judge);
-        this.createParticles(lane, this.getColorFromJudge(judge)); 
-
-        if (targetNote.isLong) {
-            targetNote.holding = true;
-            this.showJudgment(judge, score / 2, true); 
-        } else {
-            this.showJudgment(judge, score, false);
-            targetNote.hit = true;
-            targetNote.mesh.visible = false; 
-        }
-    }
-
-    addStatCount(judge) {
-        if (judge === 'PERFECT') this.perfectCount++;
-        else if (judge === 'GREAT') this.greatCount++;
-        else if (judge === 'GOOD') this.goodCount++;
-        else if (judge === 'BAD') this.badCount++;
-        else if (judge === 'MISS') this.missCount++;
-    }
-
-    showJudgment(text, scoreAdd, isLongHold = false) {
-        const judgeEl = document.getElementById('judge-text');
-        const comboContainer = document.getElementById('combo-container');
-        const comboEl = document.getElementById('combo-display');
-        judgeEl.innerText = text;
-        
-        if(text === 'PERFECT') judgeEl.style.color = '#ff4444'; 
-        else if(text === 'GREAT') judgeEl.style.color = '#ffaa00'; 
-        else judgeEl.style.color = '#ffff00';
-
-        if (text === 'MISS' || text === 'BAD' || text === 'GOOD') {
-            this.combo = 0;
-            if(text === 'MISS') this.hp -= 5;
-            if(text === 'BAD') this.hp -= 3;
-            if(text === 'GOOD') this.hp -= 1;
-        } else {
-            this.combo += 1;
-            if (this.combo > this.maxCombo) this.maxCombo = this.combo;
-        }
-
-        this.score += scoreAdd;
-        
-        // 🌟 화면 상단 스코어 표기 업데이트
-        document.getElementById('score-display').innerText = String(this.score).padStart(6, '0');
-        
-        // 🌟 HP 바 너비와 숫자 텍스트 모두 실시간으로 갱신
-        document.getElementById('hp-fill').style.width = `${Math.max(0, this.hp)}%`;
-        document.getElementById('hp-text').innerText = Math.max(0, this.hp); 
-        
-        if (this.combo > 1) {
-            comboContainer.style.display = 'block';
-            comboEl.innerText = this.combo;
-        } else {
-            comboContainer.style.display = 'none';
-        }
-
-        judgeEl.style.transition = 'none'; 
-        judgeEl.style.transform = 'translate(-50%, -50%) scale(1.6)'; 
-        judgeEl.style.opacity = '1';
-
-        void judgeEl.offsetWidth;
-
-        if (isLongHold) {
-            judgeEl.style.transition = 'transform 0.1s ease-out';
-            judgeEl.style.transform = 'translate(-50%, -50%) scale(1)';
-        } else {
-            judgeEl.style.transition = 'transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s 0.5s ease-out';
-            judgeEl.style.transform = 'translate(-50%, -50%) scale(1)';
-            judgeEl.style.opacity = '0';
-        }
-
-        if (this.hp <= 0 && this.isPlaying) {
-            this.isPlaying = false;
-            if (this.onGameOver) this.onGameOver(this.getStats());
-        }
-    }
-
-    getStats() {
-        return { 
-            score: this.score, 
-            hp: this.hp, maxCombo: this.maxCombo, totalNotes: this.totalNotes,
-            perfectCount: this.perfectCount, greatCount: this.greatCount, 
-            goodCount: this.goodCount, badCount: this.badCount, missCount: this.missCount 
-        };
-    }
-
-    cleanup() {
-        window.removeEventListener('keydown', this.boundHandleKeyDown);
-        window.removeEventListener('keyup', this.boundHandleKeyUp);
-        this.scene.remove(this.gameGroup);
-        this.activeNotes = [];
-        this.lines.forEach(l => this.gameGroup.remove(l.line));
-        this.particles.forEach(p => this.gameGroup.remove(p.mesh));
-        this.buildings.forEach(b => {
-            this.gameGroup.remove(b);
-            b.geometry.dispose();
-            b.material.dispose();
-        });
-        this.particles = [];
-        this.buildings = [];
-        this.cubeGeo.dispose();
-        this.sphereGeo.dispose();
-        this.noteMatMikuBlue.dispose();
-        this.noteMatWhite.dispose();
-    }
-
-    update() {
-        if (!this.isPlaying) return;
-        
-        const now = performance.now() / 1000;
-        const delta = now - this.lastTime;
-        this.lastTime = now;
-        
-        const currentTime = this.getCurrentTime();
-        let allNotesProcessed = true;
-
-        this.buildings.forEach(b => {
-            b.position.z += this.noteSpeed * delta;
-            if (b.position.z > 50) {
-                b.position.z -= 400; 
-            }
-        });
-
-        this.activeNotes.forEach(note => {
-            if (!note.hit) {
-                allNotesProcessed = false;
-                const startDistanceLeft = (note.time - currentTime) * this.noteSpeed;
+        <div id="ingame-ui">
+            <div class="top-bar">
+                <div class="score-box">SCORE <br><span id="score-display">000000</span></div>
                 
-                if (note.holding) {
-                    note.mesh.position.z = this.targetZ; 
+                <div class="hp-box">
+                    HP <span id="hp-text">100</span>
+                    <div class="hp-bar"><div id="hp-fill" class="hp-fill"></div></div>
+                </div>
+                
+            </div>
+            <div id="judge-text"></div>
+            <div id="combo-container">
+                <div class="triangle-bg"></div>
+                <div id="combo-title">COMBO</div>
+                <div id="combo-display"></div>
+            </div>
+            <button id="ingame-back-btn" class="game-btn">Back</button>
+        </div>
 
-                    const remainingTime = note.endTime - currentTime;
-                    const totalDuration = note.endTime - note.time;
-                    const scaleFactor = Math.max(0, remainingTime / totalDuration);
-                    note.mesh.scale.z = scaleFactor; 
-
-                    const judgeEl = document.getElementById('judge-text');
-                    judgeEl.style.opacity = '1';
-
-                    if (currentTime >= note.endTime) {
-                        note.holding = false;
-                        note.hit = true;
-                        note.mesh.visible = false;
-                        this.addStatCount('PERFECT'); 
-                        this.showJudgment('PERFECT', 100, false); 
-                        this.createParticles(note.lane, 0xff4444); 
-                    }
-                } else {
-                    note.mesh.position.z = this.targetZ - startDistanceLeft;
-                    if (!note.isLong) {
-                        note.mesh.rotation.x += 0.05;
-                        note.mesh.rotation.y += 0.02;
-                    }
-
-                    const passTime = note.isLong ? note.endTime : note.time;
-                    const passDistance = (passTime - currentTime) * this.noteSpeed;
-
-                    if (passDistance < -30) { 
-                        note.hit = true;
-                        note.mesh.visible = false;
-                        this.missCount++;
-                        this.showJudgment('MISS', 0, false);
-                    }
-                }
-            }
-        });
-
-        this.lines.forEach(l => {
-            const distanceLeft = (l.time - currentTime) * this.noteSpeed;
-            const aliveNotes = l.notes.filter(n => !n.hit);
-
-            if (distanceLeft < -30 || aliveNotes.length < 2) {
-                l.line.visible = false;
-            } else {
-                const points = aliveNotes.map(n => n.mesh.position);
-                l.line.geometry.setFromPoints(points);
-                l.line.visible = true;
-            }
-        });
-
-        for (let i = this.particles.length - 1; i >= 0; i--) {
-            const p = this.particles[i];
-            p.life -= 0.04;
-            if (p.life <= 0) {
-                this.gameGroup.remove(p.mesh);
-                p.mesh.geometry.dispose();
-                p.mesh.material.dispose();
-                this.particles.splice(i, 1);
-            } else {
-                const positions = p.mesh.geometry.attributes.position.array;
-                for(let j=0; j<positions.length/3; j++) {
-                    positions[j*3] += p.velocities[j].x;
-                    positions[j*3+1] += p.velocities[j].y;
-                    positions[j*3+2] += p.velocities[j].z;
-                }
-                p.mesh.geometry.attributes.position.needsUpdate = true;
-                p.mesh.material.opacity = p.life;
-            }
-        }
-
-        if(this.songData.notes.length > 0) {
-           const lastNoteTime = this.songData.notes[this.songData.notes.length - 1].endTime || this.songData.notes[this.songData.notes.length - 1].time;
-           if (allNotesProcessed && currentTime > lastNoteTime + 2 && this.isPlaying) {
-               this.isPlaying = false;
-               if (this.onClear) this.onClear(this.getStats());
-           }
-        }
-    }
-}
+        <div id="result-ui">
+            <div id="result-status"></div>
+            <div id="result-max-combo"></div>
+            <div id="result-detailed-stats">
+                <div class="stat-line" style="color: #ff4444;">PERFECT <span id="res-perfect">0</span></div>
+                <div class="stat-line" style="color: #ffaa00;">GREAT <span id="res-great">0</span></div>
+                <div class="stat-line" style="color: #ffff00;">GOOD <span id="res-good">0</span></div>
+                <div class="stat-line" style="color: #aaaaaa;">BAD <span id="res-bad">0</span></div>
+                <div class="stat-line" style="color: #ff0000;">MISS <span id="res-miss">0</span></div>
+            </div>
+            <button id="result-back-btn" class="game-btn" style="position: relative; bottom: auto;">Go to Song Select</button>
+        </div>
+    </div>
+    
+    <script type="module" src="./main.js"></script>
+</body>
+</html>
