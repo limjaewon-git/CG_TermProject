@@ -1,8 +1,12 @@
 import * as THREE from 'three';
 import { Song1 } from './song1.js';
 import { Song2 } from './song2.js'; 
+import { Song3 } from './song3.js'; 
 import { InGameScreen } from './ingame_screen.js';
 import { showResultScreen } from './result_screen.js';
+import { GameSettings } from './setting.js'; 
+
+GameSettings.init();
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -18,7 +22,7 @@ const container = document.getElementById('canvas-container');
 container.appendChild(renderer.domElement);
 
 let gameScreen = null;
-let countdownInterval = null;
+let delayTimeout = null;
 let currentSongData = Song1;
 let currentSongId = "song1";
 let videoStarted = false; 
@@ -28,14 +32,41 @@ const videoElement = document.getElementById('bg-video');
 const startUi = document.getElementById('start-ui');
 const selectUi = document.getElementById('select-ui');
 const ingameUi = document.getElementById('ingame-ui');
-const countdownEl = document.getElementById('countdown-display');
+const touchZones = document.getElementById('touch-zones'); 
+const settingsUi = document.getElementById('settings-ui'); 
+
+const boardContent = document.getElementById('board-content');
 
 const startBtn = document.getElementById('start-btn');
 const songBtn = document.getElementById('song-hoyohoyo');
 const songBtn2 = document.getElementById('song-rinne'); 
+const songBtn3 = document.getElementById('song-cherry'); 
 const selectBackBtn = document.getElementById('select-back-btn'); 
 const playSongBtn = document.getElementById('play-song-btn'); 
 const ingameBackBtn = document.getElementById('ingame-back-btn');
+
+const setBtnOpen = document.getElementById('setting-btn-open');
+const setBtnClose = document.getElementById('setting-btn-close');
+const inVol = document.getElementById('input-vol');
+const inSpeed = document.getElementById('input-speed');
+const valVol = document.getElementById('val-vol');
+const valSpeed = document.getElementById('val-speed');
+
+inVol.value = GameSettings.volume * 100;
+valVol.innerText = `${inVol.value}%`;
+inSpeed.value = GameSettings.noteSpeed;
+valSpeed.innerText = inSpeed.value;
+
+inVol.addEventListener('input', (e) => { valVol.innerText = `${e.target.value}%`; });
+inSpeed.addEventListener('input', (e) => { valSpeed.innerText = e.target.value; });
+
+setBtnOpen.addEventListener('click', () => { settingsUi.style.display = 'block'; });
+setBtnClose.addEventListener('click', () => {
+    GameSettings.volume = inVol.value / 100;
+    GameSettings.noteSpeed = parseInt(inSpeed.value);
+    GameSettings.save();
+    settingsUi.style.display = 'none';
+});
 
 startBtn.addEventListener('click', () => {
     startUi.style.display = 'none';
@@ -50,6 +81,13 @@ selectBackBtn.addEventListener('click', () => {
 
 function showSongRecord(songId) {
     currentSongId = songId;
+    
+    if (boardContent) {
+        boardContent.classList.remove('animate-board');
+        void boardContent.offsetWidth;
+        boardContent.classList.add('animate-board');
+    }
+
     document.querySelectorAll('.song-node-btn').forEach(btn => btn.classList.remove('active'));
     
     const difficultyEl = document.getElementById('board-difficulty');
@@ -67,9 +105,13 @@ function showSongRecord(songId) {
         currentSongData = Song2;
         difficultyEl.innerText = "MEDIUM";
         difficultyEl.style.color = "#ffaa00"; 
+    } else if (songId === "song3") {
+        songBtn3.classList.add('active');
+        currentSongData = Song3;
+        difficultyEl.innerText = "HARD";
+        difficultyEl.style.color = "#ff4444"; 
     }
 
-    // 🌟 영구 저장이 아닌, 브라우저 세션 중복을 초기화하는 sessionStorage 사용
     const savedData = sessionStorage.getItem(`HighScore_${songId}`);
     if (savedData) {
         const data = JSON.parse(savedData);
@@ -101,6 +143,7 @@ function showSongRecord(songId) {
 
 songBtn.addEventListener('click', () => showSongRecord("song1"));
 songBtn2.addEventListener('click', () => showSongRecord("song2"));
+songBtn3.addEventListener('click', () => showSongRecord("song3"));
 
 playSongBtn.addEventListener('click', () => {
     executeGamePlay(currentSongData, currentSongId);
@@ -109,7 +152,6 @@ playSongBtn.addEventListener('click', () => {
 async function executeGamePlay(songData, songId) {
     selectUi.style.display = 'none';
     
-    // 🌟 인게임 화면 입장 시, 이전 게임의 기록 UI 흔적들을 남김없이 리셋
     document.getElementById('hp-fill').style.width = '100%';
     document.getElementById('hp-text').innerText = '100';
     document.getElementById('score-display').innerText = '000000';
@@ -120,42 +162,31 @@ async function executeGamePlay(songData, songId) {
     videoElement.src = songData.audioFile;
     videoElement.style.display = 'block';
     videoElement.currentTime = 0;
+    
+    videoElement.volume = GameSettings.volume;
     videoElement.muted = false; 
     videoStarted = false; 
     
     await songData.loadAudio(videoElement);
 
-    gameScreen = new InGameScreen(scene, camera, songData);
+    gameScreen = new InGameScreen(scene, camera, songData, GameSettings.noteSpeed);
     gameScreen.onGameOver = (stats) => endGameAndShowResult(stats, songId);
     gameScreen.onClear = (stats) => endGameAndShowResult(stats, songId);
     
     ingameUi.style.display = 'block';
-    countdownEl.style.display = 'block';
+    touchZones.style.display = 'grid'; 
     
     gameScreen.start(3);
 
-    let count = 3;
-    countdownEl.innerText = count;
-
-    countdownInterval = setInterval(() => {
-        count--;
-        if (count > 0) {
-            countdownEl.innerText = count;
-        } else if (count === 0) {
-            countdownEl.innerText = 'START!';
-        } else {
-            clearInterval(countdownInterval);
-            countdownInterval = null;
-            countdownEl.style.display = 'none';
-        }
-    }, 1000);
+    delayTimeout = setTimeout(() => {
+        delayTimeout = null;
+    }, 3000);
 }
 
 ingameBackBtn.addEventListener('click', () => {
-    if (countdownInterval) {
-        clearInterval(countdownInterval);
-        countdownInterval = null;
-        countdownEl.style.display = 'none';
+    if (delayTimeout) {
+        clearTimeout(delayTimeout);
+        delayTimeout = null;
     }
     if (gameScreen) {
         gameScreen.isPlaying = false;
@@ -164,6 +195,7 @@ ingameBackBtn.addEventListener('click', () => {
     }
     stopVideo();
     ingameUi.style.display = 'none';
+    touchZones.style.display = 'none';
     backToSelect();
 });
 
@@ -175,6 +207,7 @@ function stopVideo() {
 function endGameAndShowResult(stats, songId) {
     stopVideo();
     ingameUi.style.display = 'none';
+    touchZones.style.display = 'none';
     showResultScreen(stats, songId, backToSelect);
     
     if (gameScreen) {
