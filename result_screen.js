@@ -37,7 +37,6 @@ export function showResultScreen(stats, songId, onGoToSelect) {
     document.getElementById('res-bad').innerText = stats.badCount;
     document.getElementById('res-miss').innerText = stats.missCount;
 
-    // 🌟 영구 저장소가 아닌 세션(임시) 저장소 사용
     if (stats.hp > 0) {
         const savedRecord = sessionStorage.getItem(`HighScore_${songId}`);
         let currentHighScore = -1; 
@@ -47,7 +46,6 @@ export function showResultScreen(stats, songId, onGoToSelect) {
             currentHighScore = parsed.score || 0;
         }
 
-        // 이번 연주 점수가 기존 최고 점수보다 "높을 때" 덮어쓰기!
         if (stats.score > currentHighScore) {
             const recordObj = {
                 score: stats.score,
