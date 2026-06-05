@@ -56,7 +56,7 @@ function generateEasyLongBeatmap() {
         time += 2.0;
     }
 
-    // 🌟 마지막 110초에 떨어지는 피니시 강렬한 동시치기 노트!
+    // 마지막 110초에 떨어지는 강렬한 동시치기 노트
     generatedNotes.push({ time: time, lane: 4 });
     generatedNotes.push({ time: time, lane: 7 });
 
