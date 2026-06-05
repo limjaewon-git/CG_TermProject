@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 export class InGameScreen {
-    constructor(scene, camera, songData) {
+    constructor(scene, camera, songData, noteSpeed = 40) {
         this.scene = scene;
         this.camera = camera;
         this.songData = songData;
@@ -22,11 +22,13 @@ export class InGameScreen {
         this.lines = []; 
         this.particles = []; 
         this.buildings = []; 
+        this.keyHints = []; 
         
         this.startTime = 0;
         this.lastTime = 0; 
         this.isPlaying = false;
-        this.noteSpeed = 40; 
+        
+        this.noteSpeed = noteSpeed; 
         
         this.keyMap = { 'e': 0, 'r': 1, 'u': 2, 'i': 3, 'd': 4, 'f': 5, 'j': 6, 'k': 7 };
         
@@ -40,9 +42,18 @@ export class InGameScreen {
         
         this.boundHandleKeyDown = this.handleKeyDown.bind(this);
         this.boundHandleKeyUp = this.handleKeyUp.bind(this);
-        
         window.addEventListener('keydown', this.boundHandleKeyDown);
         window.addEventListener('keyup', this.boundHandleKeyUp); 
+
+        this.touchZones = document.querySelectorAll('#touch-zones div');
+        this.boundHandleTouchStart = this.handleTouchStart.bind(this);
+        this.boundHandleTouchEnd = this.handleTouchEnd.bind(this);
+        
+        this.touchZones.forEach(zone => {
+            zone.addEventListener('touchstart', this.boundHandleTouchStart, {passive: false});
+            zone.addEventListener('touchend', this.boundHandleTouchEnd, {passive: false});
+            zone.addEventListener('touchcancel', this.boundHandleTouchEnd, {passive: false});
+        });
     }
 
     initEnvironment() {
@@ -56,10 +67,16 @@ export class InGameScreen {
         const targetGeo = new THREE.BoxGeometry(3, 3, 0.5);
         const targetMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.8 });
         
-        this.lanePositions.forEach(pos => {
+        const keyLetters = ['E', 'R', 'U', 'I', 'D', 'F', 'J', 'K'];
+
+        this.lanePositions.forEach((pos, i) => {
             const target = new THREE.Mesh(targetGeo, targetMat);
             target.position.set(pos.x, pos.y, this.targetZ);
             this.gameGroup.add(target);
+
+            const hintMesh = this.createHintText(keyLetters[i], pos.x, pos.y, this.targetZ + 0.1);
+            this.gameGroup.add(hintMesh);
+            this.keyHints.push(hintMesh);
         });
 
         const railMat = new THREE.LineBasicMaterial({ color: 0x39C5BB, transparent: true, opacity: 0.4 });
@@ -81,6 +98,26 @@ export class InGameScreen {
         this.initNeonBuildings(); 
 
         this.scene.add(this.gameGroup);
+    }
+
+    createHintText(text, x, y, z) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 128; canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        ctx.font = 'bold 80px Arial';
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        ctx.shadowColor = '#39C5BB';
+        ctx.shadowBlur = 15;
+        ctx.fillText(text, 64, 64);
+        
+        const tex = new THREE.CanvasTexture(canvas);
+        const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), mat);
+        mesh.position.set(x, y, z);
+        return mesh;
     }
 
     initNeonBuildings() {
@@ -215,7 +252,21 @@ export class InGameScreen {
         return 0xaaaaaa; 
     }
 
+    handleTouchStart(e) {
+        e.preventDefault(); 
+        const lane = parseInt(e.target.dataset.lane);
+        if(!isNaN(lane)) this.checkHit(lane);
+    }
+    
+    handleTouchEnd(e) {
+        e.preventDefault();
+        const lane = parseInt(e.target.dataset.lane);
+        if(!isNaN(lane)) this.releaseLane(lane);
+    }
+
     handleKeyDown(event) {
+        if (event.repeat) return; 
+        
         if (!this.isPlaying) return;
         const key = event.key.toLowerCase();
         const lane = this.keyMap[key];
@@ -226,15 +277,36 @@ export class InGameScreen {
         if (!this.isPlaying) return;
         const key = event.key.toLowerCase();
         const lane = this.keyMap[key];
-        if (lane === undefined) return;
+        if (lane !== undefined) this.releaseLane(lane);
+    }
 
+    releaseLane(lane) {
         const holdingNote = this.activeNotes.find(n => n.lane === lane && n.holding);
         if (holdingNote) {
+            const currentTime = this.getCurrentTime();
+            // 롱노트가 끝나야 하는 시간과 현재 뗀 시간의 차이 계산
+            const timeDiff = holdingNote.endTime - currentTime; 
+            
             holdingNote.holding = false;
             holdingNote.hit = true;
             holdingNote.mesh.visible = false;
-            this.addStatCount('MISS'); 
-            this.showJudgment('MISS', 0, false); 
+
+            // 롱노트를 뗄 때의 관대한 판정
+            // 다음 단일 노트를 치기 위해 0.15초 정도 일찍 떼어도 PERFECT로 인정
+            if (timeDiff <= 0.15) {
+                this.addStatCount('PERFECT');
+                this.showJudgment('PERFECT', 100, false);
+                this.createParticles(lane, 0xff4444);
+            } else if (timeDiff <= 0.3) {
+                // 약간 더 일찍 떼면 GREAT
+                this.addStatCount('GREAT');
+                this.showJudgment('GREAT', 60, false);
+                this.createParticles(lane, 0xffaa00);
+            } else {
+                // 너무 일찍 떼버리면 그제서야 MISS
+                this.addStatCount('MISS'); 
+                this.showJudgment('MISS', 0, false); 
+            }
         }
     }
 
@@ -300,10 +372,7 @@ export class InGameScreen {
 
         this.score += scoreAdd;
         
-        // 🌟 화면 상단 스코어 표기 업데이트
         document.getElementById('score-display').innerText = String(this.score).padStart(6, '0');
-        
-        // 🌟 HP 바 너비와 숫자 텍스트 모두 실시간으로 갱신
         document.getElementById('hp-fill').style.width = `${Math.max(0, this.hp)}%`;
         document.getElementById('hp-text').innerText = Math.max(0, this.hp); 
         
@@ -347,6 +416,13 @@ export class InGameScreen {
     cleanup() {
         window.removeEventListener('keydown', this.boundHandleKeyDown);
         window.removeEventListener('keyup', this.boundHandleKeyUp);
+        
+        this.touchZones.forEach(zone => {
+            zone.removeEventListener('touchstart', this.boundHandleTouchStart);
+            zone.removeEventListener('touchend', this.boundHandleTouchEnd);
+            zone.removeEventListener('touchcancel', this.boundHandleTouchEnd);
+        });
+
         this.scene.remove(this.gameGroup);
         this.activeNotes = [];
         this.lines.forEach(l => this.gameGroup.remove(l.line));
@@ -356,8 +432,16 @@ export class InGameScreen {
             b.geometry.dispose();
             b.material.dispose();
         });
+        this.keyHints.forEach(h => {
+            this.gameGroup.remove(h);
+            h.material.map.dispose();
+            h.material.dispose();
+            h.geometry.dispose();
+        });
+        
         this.particles = [];
         this.buildings = [];
+        this.keyHints = [];
         this.cubeGeo.dispose();
         this.sphereGeo.dispose();
         this.noteMatMikuBlue.dispose();
@@ -373,6 +457,16 @@ export class InGameScreen {
         
         const currentTime = this.getCurrentTime();
         let allNotesProcessed = true;
+
+        if (currentTime >= 0 && this.keyHints.length > 0) {
+            this.keyHints.forEach(h => {
+                this.gameGroup.remove(h);
+                h.material.map.dispose();
+                h.material.dispose();
+                h.geometry.dispose();
+            });
+            this.keyHints = [];
+        }
 
         this.buildings.forEach(b => {
             b.position.z += this.noteSpeed * delta;
@@ -397,6 +491,7 @@ export class InGameScreen {
                     const judgeEl = document.getElementById('judge-text');
                     judgeEl.style.opacity = '1';
 
+                    // 롱노트를 끝까지 꾹 누르고 있었다면 자동으로 PERFECT 처리!
                     if (currentTime >= note.endTime) {
                         note.holding = false;
                         note.hit = true;
