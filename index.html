@@ -8,7 +8,7 @@
         
         #bg-video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
         #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; }
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; perspective: 1500px; }
         
         .game-btn {
             pointer-events: auto; padding: 15px 40px; font-size: 22px; font-weight: bold; 
@@ -18,44 +18,95 @@
             text-shadow: 0 0 5px #000; transition: all 0.2s ease;
         }
         .game-btn:hover {
-            transform: scale(1.03); background: #fff; color: #39C5BB;
+            transform: scale(1.05) translateZ(10px); background: #fff; color: #39C5BB;
             box-shadow: 0 0 25px #fff, 0 0 35px #39C5BB;
         }
 
         #start-ui { 
             display: flex; flex-direction: column; align-items: center; justify-content: center; 
-            height: 100%; background-image: url('./start_screen.jpg'); background-size: cover; background-position: center; pointer-events: auto;
+            height: 100%; background-image: url('./start_screen.jpg'); background-size: cover; background-position: center; 
+            pointer-events: auto; transform-style: preserve-3d;
         }
         .title-logo {
-            position: absolute; top: 60px; right: 60px; font-size: 52px; font-weight: bold; color: #87CEEB; 
-            text-shadow: -3px -3px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000, 3px 3px 0 #000, 0 0 20px #39C5BB;
+            position: absolute; top: 80px; font-size: 60px; font-weight: bold; color: #87CEEB; 
+            text-shadow: 0 1px 0 #000, 0 2px 0 #111, 0 3px 0 #222, 0 4px 0 #333, 0 5px 0 #444, 0 6px 10px rgba(57,197,187,0.8), 0 0 30px #39C5BB;
+            transform: translateZ(50px);
         }
 
         #select-ui { 
             display: none; width: 100%; height: 100%; 
             background-image: url('./select_screen.jpg'); background-size: cover; background-position: center;
             pointer-events: auto; box-sizing: border-box; padding: 60px;
-            align-items: center; justify-content: space-between;
+            justify-content: space-between; align-items: center; 
         }
+        
+        .panel-wrapper-left, .panel-wrapper-right {
+            width: 42%; max-width: 600px; height: 75%;
+            perspective: 1200px; pointer-events: auto;
+        }
+
+        /* 좌측 곡 선택 패널 본체 */
         .song-selection-panel {
-            display: flex; flex-direction: column; width: 45%; height: 70%; justify-content: center; gap: 25px;
+            width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: space-between;
+            background: rgba(0,0,0,0.55); padding: 40px 30px 40px 40px; border-radius: 20px; box-sizing: border-box;
+            box-shadow: -10px 10px 30px rgba(0,0,0,0.8), inset 0 0 20px rgba(57,197,187,0.3); border: 1px solid rgba(57,197,187,0.5);
+            transform-origin: left center; transform: rotateY(12deg);
         }
+
+        .song-list-container {
+            flex-grow: 1; overflow-y: scroll; overflow-x: hidden; 
+            display: flex; flex-direction: column; gap: 20px; 
+            padding-right: 20px; margin-bottom: 20px;
+        }
+
+        .song-list-container::-webkit-scrollbar { width: 10px; }
+        .song-list-container::-webkit-scrollbar-track { 
+            background: rgba(0, 0, 0, 0.4); border-radius: 10px; border: 1px solid rgba(57, 197, 187, 0.2);
+        }
+        .song-list-container::-webkit-scrollbar-thumb { 
+            background: linear-gradient(180deg, #39C5BB 0%, #2b938b 100%); border-radius: 10px; box-shadow: 0 0 12px #39C5BB; 
+        }
+        .song-list-container::-webkit-scrollbar-thumb:hover { 
+            background: #fff; box-shadow: 0 0 20px #fff, 0 0 30px #39C5BB;
+        }
+
         .song-node-btn {
-            width: 100%; text-align: left; font-size: 24px; padding: 22px 30px;
+            width: 100%; text-align: left; font-size: 24px; padding: 22px 30px; box-sizing: border-box;
             background: rgba(0, 0, 0, 0.75); border: 2px solid #39C5BB; border-radius: 20px;
-            color: #fff; cursor: pointer; transition: all 0.2s; pointer-events: auto;
-            box-shadow: 0 0 10px rgba(57, 197, 187, 0.2);
+            color: #fff; cursor: pointer; transition: all 0.3s; pointer-events: auto; flex-shrink: 0;
         }
         .song-node-btn:hover, .song-node-btn.active {
             background: linear-gradient(90deg, rgba(57,197,187,0.8) 0%, rgba(0,0,0,0.7) 100%);
-            border-color: #fff; box-shadow: 0 0 20px #39C5BB; transform: translateX(12px);
+            border-color: #fff; box-shadow: 0 0 20px #39C5BB; transform: translateX(10px);
         }
         
+        /* 우측 대시보드 패널 본체 */
         .record-dashboard {
-            width: 45%; height: 75%; background: rgba(0, 0, 0, 0.82);
-            border: 3px solid #39C5BB; border-radius: 25px; box-shadow: 0 0 30px rgba(57,197,187,0.4);
-            box-sizing: border-box; padding: 40px; color: white; display: flex; flex-direction: column; justify-content: space-between;
+            width: 100%; height: 100%; background: rgba(0, 0, 0, 0.82);
+            border: 3px solid #39C5BB; border-radius: 25px; box-sizing: border-box; padding: 40px; color: white; 
+            display: flex; flex-direction: column; justify-content: space-between;
+            box-shadow: 10px 10px 40px rgba(0,0,0,0.9), inset 0 0 30px rgba(57,197,187,0.4);
+            transform-origin: right center; transform: rotateY(-12deg);
         }
+        
+        /* 스코어 보드가 휙휙 넘겨지는 입체 애니메이션 정의 */
+        @keyframes flipUpdate {
+            0% { opacity: 0; transform: translateY(40px) rotateX(-60deg) scale(0.9); }
+            100% { opacity: 1; transform: translateY(0px) rotateX(0deg) scale(1); }
+        }
+        
+        /* 애니메이션 클래스 */
+        .animate-board {
+            /* 텐션을 주는 cubic-bezier로 리듬게임 특유의 느낌 구현 */
+            animation: flipUpdate 0.4s cubic-bezier(0.25, 1.2, 0.5, 1) forwards;
+        }
+
+        /* 스코어 보드 내부 컨텐츠 래퍼 */
+        #board-content {
+            transform-style: preserve-3d;
+            transform-origin: bottom center;
+        }
+
         .dashboard-title { font-size: 32px; font-weight: bold; color: #87CEEB; border-bottom: 2px solid #39C5BB; padding-bottom: 12px; text-shadow: 0 0 10px #39C5BB; }
         .stat-row { display: flex; justify-content: space-between; font-size: 24px; margin: 20px 0; color: #eee; font-weight: bold; align-items: center; }
         .stat-value { color: #39C5BB; text-shadow: 0 0 8px rgba(57,197,187,0.6); font-size: 28px; }
@@ -64,25 +115,40 @@
             text-shadow: 0 0 10px rgba(255,255,255,0.3); display: none; background: rgba(255,255,255,0.05); margin-top: 15px;
         }
 
-        #ingame-ui { display: none; padding: 20px; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); width: 100%; height: 100%; box-sizing: border-box; position: relative; }
-        #countdown-display { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 150px; font-weight: bold; color: white; text-shadow: 0 0 30px #39C5BB; z-index: 20; }
-        .top-bar { display: flex; justify-content: space-between; font-size: 28px; font-weight: bold; }
+        #settings-ui {
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9); border: 3px solid #39C5BB; border-radius: 20px; padding: 40px; width: 400px;
+            z-index: 50; color: white; box-shadow: 0 0 50px rgba(0,0,0,1), 0 0 20px #39C5BB; pointer-events: auto;
+        }
+        .settings-title { font-size: 30px; font-weight: bold; color: #39C5BB; text-align: center; margin-bottom: 30px; }
+        .setting-group { margin-bottom: 25px; }
+        .setting-group label { display: block; font-size: 18px; margin-bottom: 10px; font-weight: bold; }
+        .setting-group input[type="range"] { width: 100%; cursor: pointer; }
+        .setting-value-display { float: right; color: #87CEEB; }
+
+        #setting-btn-open { position: absolute; top: 30px; right: 30px; padding: 10px 20px; font-size: 18px; z-index: 10; pointer-events: auto; }
+
+        #touch-zones {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5;
+            grid-template-rows: 1fr 1fr; grid-template-columns: 1fr 1fr 1fr 1fr; pointer-events: auto;
+        }
+        #touch-zones div { width: 100%; height: 100%; }
+
+        #ingame-ui { display: none; padding: 20px; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); width: 100%; height: 100%; box-sizing: border-box; position: relative; pointer-events: none; z-index: 10; }
+        .top-bar { display: flex; justify-content: space-between; font-size: 28px; font-weight: bold; pointer-events: none; }
         .score-box span { color: #39C5BB; font-size: 40px; }
-        
-        /* 🌟 HP 텍스트 숫자와 게이지 바 정렬 스타일 추가 */
         .hp-box { display: flex; align-items: center; font-size: 28px; font-weight: bold; }
         #hp-text { color: #39C5BB; margin-left: 15px; font-size: 32px; min-width: 60px; text-align: right; text-shadow: 0 0 8px #39C5BB;}
         .hp-bar { width: 300px; height: 20px; background: rgba(0,0,0,0.5); border: 2px solid white; margin-left: 15px; }
         .hp-fill { width: 100%; height: 100%; background: #39C5BB; transition: width 0.2s; }
-        
-        #ingame-back-btn { position: absolute; bottom: 30px; left: 30px; background: #ff4444; border-color: #ff8888; box-shadow: 0 0 15px #ff4444; }
-        #judge-text { position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); font-size: 60px; font-weight: bold; text-align: center; }
-        #combo-container { position: absolute; top: 50%; right: 10%; transform: translateY(-50%); text-align: center; display: none; }
+        #ingame-back-btn { position: absolute; bottom: 30px; left: 30px; background: #ff4444; border-color: #ff8888; box-shadow: 0 0 15px #ff4444; pointer-events: auto; z-index: 20; }
+        #judge-text { position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); font-size: 60px; font-weight: bold; text-align: center; pointer-events: none; }
+        #combo-container { position: absolute; top: 50%; right: 10%; transform: translateY(-50%); text-align: center; display: none; pointer-events: none; }
         .triangle-bg { width: 0; height: 0; border-left: 80px solid transparent; border-right: 80px solid transparent; border-top: 120px solid rgba(255, 255, 255, 0.2); position: absolute; top: -10px; left: 50%; transform: translateX(-50%); z-index: -1; }
         #combo-title { font-size: 20px; font-weight: bold; color: white; margin-bottom: 5px; }
         #combo-display { font-size: 45px; color: #39C5BB; font-weight: bold; }
 
-        #result-ui { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); flex-direction: column; align-items: center; justify-content: center; pointer-events: auto; z-index: 10;}
+        #result-ui { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); flex-direction: column; align-items: center; justify-content: center; pointer-events: auto; z-index: 30;}
         #result-status { font-size: 70px; font-weight: bold; margin-bottom: 10px; }
         #result-max-combo { font-size: 35px; color: #39C5BB; margin-bottom: 30px; font-weight: bold; }
         #result-detailed-stats { font-size: 24px; color: white; margin-bottom: 40px; text-align: left; line-height: 1.8; width: 250px; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); }
@@ -102,7 +168,24 @@
     <div id="canvas-container"></div>
 
     <div id="ui-layer">
-        <div id="countdown-display"></div>
+
+        <div id="touch-zones">
+            <div data-lane="0"></div><div data-lane="1"></div><div data-lane="2"></div><div data-lane="3"></div>
+            <div data-lane="4"></div><div data-lane="5"></div><div data-lane="6"></div><div data-lane="7"></div>
+        </div>
+
+        <div id="settings-ui">
+            <div class="settings-title">SETTINGS</div>
+            <div class="setting-group">
+                <label>Music Volume <span id="val-vol" class="setting-value-display">50%</span></label>
+                <input type="range" id="input-vol" min="0" max="100" value="50">
+            </div>
+            <div class="setting-group">
+                <label>Note Speed <span id="val-speed" class="setting-value-display">40</span></label>
+                <input type="range" id="input-speed" min="10" max="150" value="40" step="1">
+            </div>
+            <button id="setting-btn-close" class="game-btn" style="width: 100%; margin-top: 10px;">APPLY & CLOSE</button>
+        </div>
 
         <div id="start-ui">
             <div class="title-logo">Hatsune Miku in 3D Rhythm Game</div>
@@ -110,42 +193,49 @@
         </div>
 
         <div id="select-ui">
-            <div class="song-selection-panel">
-                <button id="song-hoyohoyo" class="song-node-btn">♪ HoYoHoYoにしてあげる♪</button>
-                <button id="song-rinne" class="song-node-btn">♪ いますぐ輪廻</button>
-                <button id="select-back-btn" class="game-btn" style="position: relative; bottom: auto; align-self: flex-start; margin-top: 25px; background: #444; border-color: #666; box-shadow: 0 0 10px #444;">BACK TO MAIN</button>
+            <button id="setting-btn-open" class="game-btn">⚙️ SETTINGS</button>
+            
+            <div class="panel-wrapper-left">
+                <div class="song-selection-panel">
+                    <div class="song-list-container">
+                        <button id="song-hoyohoyo" class="song-node-btn">♪ HoYoHoYoにしてあげる♪</button>
+                        <button id="song-rinne" class="song-node-btn">♪ いますぐ輪廻</button>
+                        <button id="song-cherry" class="song-node-btn">♪ チェリーポップ</button>
+                    </div>
+                    <button id="select-back-btn" class="game-btn" style="width: 100%; background: #444; border-color: #666; box-shadow: 0 0 10px #444;">BACK TO MAIN</button>
+                </div>
             </div>
             
-            <div class="record-dashboard">
-                <div>
-                    <div class="dashboard-title">SONG INFO & RECORDS</div>
-                    <div class="stat-row" style="margin-top: 25px;">
-                        <span>DIFFICULTY</span>
-                        <span id="board-difficulty" class="stat-value" style="font-weight: 900;">EASY</span>
+            <div class="panel-wrapper-right">
+                <div class="record-dashboard">
+                    <div id="board-content">
+                        <div class="dashboard-title">SONG INFO & RECORDS</div>
+                        <div class="stat-row" style="margin-top: 25px;">
+                            <span>DIFFICULTY</span>
+                            <span id="board-difficulty" class="stat-value" style="font-weight: 900;">EASY</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>HIGH SCORE</span>
+                            <span id="board-score" class="stat-value">000,000</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>MAX COMBO</span>
+                            <span id="board-combo" class="stat-value">0</span>
+                        </div>
+                        <div id="board-medal" class="medal-badge">NO RECORD</div>
                     </div>
-                    <div class="stat-row">
-                        <span>HIGH SCORE</span>
-                        <span id="board-score" class="stat-value">000,000</span>
-                    </div>
-                    <div class="stat-row">
-                        <span>MAX COMBO</span>
-                        <span id="board-combo" class="stat-value">0</span>
-                    </div>
-                    <div id="board-medal" class="medal-badge">NO RECORD</div>
+                    <button id="play-song-btn" class="game-btn" style="width: 100%;">START GAME</button>
                 </div>
-                <button id="play-song-btn" class="game-btn" style="position: relative; bottom: auto; width: 100%;">START GAME</button>
             </div>
         </div>
 
         <div id="ingame-ui">
             <div class="top-bar">
                 <div class="score-box">SCORE <br><span id="score-display">000000</span></div>
-                
                 <div class="hp-box">
                     HP <span id="hp-text">100</span>
                     <div class="hp-bar"><div id="hp-fill" class="hp-fill"></div></div>
                 </div>
-                
             </div>
             <div id="judge-text"></div>
             <div id="combo-container">
