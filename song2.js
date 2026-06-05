@@ -27,7 +27,7 @@ function generateRinneBeatmap() {
     const beat = 60 / 145;        
     const halfBeat = beat / 2;    
     
-    let time = 0.5; // START! 글자가 사라지고 곡이 켜질 때의 시작 오프셋
+    let time = 0.5;
 
     // 1. 도입부 (총 64박자 / 약 26.5초) : 가벼운 하단 단노트 위주
     for (let i = 0; i < 64; i++) {
@@ -85,7 +85,7 @@ function generateRinneBeatmap() {
 
     // 6. 대망의 피니시 (총 6박자 할당 / 약 122초 부근에서 종료)
     time += beat * 2; // 2박자 숨 고르기
-    // 4박자 길이의 거대한 피니시 롱노트! (이 노트가 끝날 때쯤 영상이 정확히 종료됩니다)
+    // 4박자 길이의 거대한 롱노트
     generatedNotes.push({ time: time, endTime: time + (beat * 4), lane: 1, isLong: true });
     generatedNotes.push({ time: time, endTime: time + (beat * 4), lane: 6, isLong: true });
 
